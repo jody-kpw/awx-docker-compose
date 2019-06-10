@@ -1,0 +1,112 @@
+version: '3'
+services:
+  postgres:
+    image: "postgres:9.6"
+    restart: always
+    networks:
+      - traefik
+    environment:
+      POSTGRES_USER: awx
+      POSTGRES_PASSWORD: awxpass
+      POSTGRES_DB: awx
+      TZ: "Asia/Hong_Kong"
+    volumes:
+      - postgresql:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: "rabbitmq:3"
+    restart: always
+    networks:
+      - traefik
+    environment:
+      RABBITMQ_DEFAULT_VHOST: awx
+      TZ: "Asia/Hong_Kong"
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+
+  memcached:
+    image: "memcached:alpine"
+    restart: always
+    networks:
+      - traefik
+    environment:
+      TZ: "Asia/Hong_Kong"
+
+  awx_web:
+    image: "ansible/awx_web:3.0.1"
+    restart: always
+    links:
+      - rabbitmq
+      - memcached
+      - postgres
+    networks:
+      - traefik
+    hostname: awxweb
+    user: root
+    environment:
+      SECRET_KEY: aabbcc
+      DATABASE_USER: awx
+      DATABASE_PASSWORD: awxpass
+      DATABASE_NAME: awx
+      DATABASE_PORT: 5432
+      DATABASE_HOST: postgres
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_VHOST: awx
+      MEMCACHED_HOST: memcached
+      MEMCACHED_PORT: 11211
+      TZ: "Asia/Hong_Kong"
+    volumes:
+      - web:/var/lib/nginx
+    labels:
+      - "traefik.docker.network=traefik"
+      - "traefik.enable=true"
+      - "traefik.frontend.rule=Host:awx.domain.com"
+      - "traefik.basic.port=8052"
+      - "traefik.basic.protocol=http"
+
+  awx_task:
+    image: "ansible/awx_task:3.0.1"
+    restart: always
+    networks:
+      - traefik
+    links:
+      - rabbitmq
+      - memcached
+      - awx_web:awxweb
+      - postgres
+    hostname: awx
+    user: root
+    environment:
+      SECRET_KEY: aabbcc
+      DATABASE_USER: awx
+      DATABASE_PASSWORD: awxpass
+      DATABASE_NAME: awx
+      DATABASE_PORT: 5432
+      DATABASE_HOST: postgres
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_VHOST: awx
+      MEMCACHED_HOST: memcached
+      MEMCACHED_PORT: 11211
+      TZ: "Asia/Hong_Kong"
+    volumes:
+      - task:/var/lib/nginx
+
+volumes:
+  postgresql:
+    driver: local
+  rabbitmq:
+    driver: local
+  web:
+    driver: local
+  task:
+    driver: local
+
+networks:
+  traefik:
+    external: true

@@ -1,0 +1,27 @@
+.ci_job: &ci_job
+    only:
+        - docker-01
+    tags:
+        - hostname.shared.ssh
+
+.ci_manual_job: &ci_manual_job
+  when: manual
+  <<: *ci_job
+
+# Defines a job stage (default: test)
+stages:
+  - test
+  - docker-compose
+
+test:
+  stage: test
+  # Defines a shell script which is executed by Runner
+  script:
+    - echo "$SUDO_PRODUCTION" | sudo -S docker info
+  <<: *ci_job
+
+docker-compose-up:
+  stage: docker-compose
+  script:
+    - echo "$SUDO_PRODUCTION" | sudo -S /usr/local/bin/docker-compose up -d
+  <<: *ci_manual_job
